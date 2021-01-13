@@ -30,10 +30,17 @@ graph_t G{
     {1, {2,  1}},
     {1, {3,  3}},
     {1, {5, 10}},
+    {2, {1,  1}},
     {2, {3,  1}},
     {2, {4,  3}},
+    {3, {1,  3}},
+    {3, {2,  1}},
     {3, {4,  1}},
-    {4, {5,  1}}
+    {4, {2,  3}},
+    {4, {3,  1}},
+    {4, {5,  1}},
+    {5, {1, 10}},
+    {5, {4,  1}}
 };
 
 using Tp = typename decltype(G)::iterator;
@@ -102,17 +109,20 @@ int main(int argc, char **argv)
     
     for (auto value : G) {
         auto key = value.first;
-        auto neighbor = value.second;
-        auto v = neighbor._v;
-        auto cost = neighbor._cost;
+        auto nbrs = G.equal_range(key);
+        for (auto nbr = nbrs.first; nbr != nbrs.second; nbr++) { 
+            auto v = (*nbr).second._v;
+            auto cost = (*nbr).second._cost;
         
-        auto even = 2 * key;
-        auto odd = 2 * key + 1;
-        G_b.insert({even, {2 * v + 1, cost}});
-        G_b.insert({odd, {2 * v, cost}});
+            auto even = 2 * key;
+            auto odd = 2 * key + 1;
+            cout << even << " " << (2 * v + 1) << endl;
+            G_b.insert({even, {2 * v + 1, cost}});
+            G_b.insert({odd, {2 * v, cost}});
+        }
     }
 
-    dijkstra(G_b, 2, 6);
+    dijkstra(G, 2, 10);
 
     return 0;
 }
