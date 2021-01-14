@@ -8,121 +8,169 @@
 
 using namespace std;
 
-struct edge_t {
-    int _v;
-    int _cost;
-    int _dist = -1;
 
+class node_t {
+
+public:
+    node_t(int id): _id{id}, _neighborhood{}, _distance{-1} {
+        
+    }
+
+    void id() {
+        cout << _id << endl;
+    }
+    
+    void print() {
+        _distance = 0;
+        for (auto n: _neighborhood) {
+            cout << _id << " --> " << n.first->_id << endl;
+        }
+
+        cout << "------" << endl;
+
+        for (auto n: _neighborhood) {
+            if (n.first->_distance < 0)
+                n.first->print();
+        }
+            
+    }
+    
+    void reset() {
+        _neighborhood.clear();
+        _distance = -1;
+    }
+    
+    void add_edge(node_t * to, int cost) {
+        _neighborhood.push_back(std::make_pair(to, cost));
+        to->_neighborhood.push_back(std::make_pair(this, cost));
+    }
+
+    std::vector<std::pair<node_t*, int>> get_neighborhood() const {
+        return _neighborhood;
+    }
+
+    void set_dist(int dist) {
+        _distance = dist;
+    }
+
+    int get_dist() const {
+        return _distance;
+    }
+        
+
+    bool is_new() const {
+        return _distance == -1;
+    }
+
+private:
+    int _id;
+    std::vector<std::pair<node_t*, int>> _neighborhood;
+    int _distance;
 };
+
+
+std::vector<std::tuple<int, int, int>> transform(
+                                 std::vector<std::tuple<int, int, int>> edges)
+{
+    decltype(edges) result{};
+
+    for (auto e: edges) {
+        int u = std::get<0>(e), v = std::get<1>(e), cost = std::get<2>(e);
+        result.push_back({2 * u, 2 * v + 1, cost});
+        result.push_back({2 * u + 1, 2 * v, cost});
+    }
+
+    return result;
+}
+
+std::pair<node_t*, node_t*> build(std::vector<std::tuple<int, int, int>> edges,
+                                  int start, int end) {
+    std::map<int, node_t*> cache{};
+    
+    for (auto edge: edges) {
+        node_t *u, *v;
+
+        // verify if u is in cache else create u.
+        if (cache.find(std::get<0>(edge)) != cache.end()) {
+            u = cache.at(std::get<0>(edge));
+        } else {
+            u = new node_t{std::get<0>(edge)};
+            cache.insert({std::get<0>(edge), u});
+        }
+
+        // do the same with v.
+        if (cache.find(std::get<1>(edge)) != cache.end()) {
+            v = cache.at(std::get<1>(edge));
+        } else {
+            v = new node_t{std::get<1>(edge)};
+            cache.insert({std::get<1>(edge), v});
+        }
+
+        // add v to neigborhood of u, and hence u to neigborhood of v.
+        u->add_edge(v, std::get<2>(edge));
+    }
+
+    return {cache.at(start), cache.at(end)}; // first node or root.
+}
 
 namespace std {
-template <>
-struct less<edge_t*> {
-    bool operator()(edge_t* l, edge_t* r) {
-        return (l->_cost + l->_dist) > (r->_cost + r->_dist);
-    }
-};
-    
-}
-using graph_t = multimap<int, edge_t>;
-
-graph_t G{
-    {1, {2,  1}},
-    {1, {3,  3}},
-    {1, {5, 10}},
-    {2, {1,  1}},
-    {2, {3,  1}},
-    {2, {4,  3}},
-    {3, {1,  3}},
-    {3, {2,  1}},
-    {3, {4,  1}},
-    {4, {2,  3}},
-    {4, {3,  1}},
-    {4, {5,  1}},
-    {5, {1, 10}},
-    {5, {4,  1}}
-};
-
-using Tp = typename decltype(G)::iterator;
-
-std::pair<Tp, Tp> get_nb(graph_t& G, int u) {
-    cout << "u = " << u << endl;
-    return G.equal_range(u);
+    using Tp = std::pair<node_t*, int>;
+    template<>
+    struct greater<Tp> {
+        bool operator()(Tp l, Tp r) {
+            return l.second > r.second;
+        }
+    };
 }
 
+using data_t = std::pair<node_t*, int>;
+using alloc_t = std::vector<data_t>;
+using pqueue_t = std::priority_queue<data_t, alloc_t, std::greater<data_t>>;
+int dijkstra(node_t *start, node_t *end) {
+    pqueue_t seen{};
+    start->set_dist(0);
+    seen.push({start, 0});
 
-int get_edge_cost(const graph_t& G, int u, int v)
-{
-    int _u = std::min(u, v);
-    int _v = std::max(u, v);
-
-    auto matches = G.equal_range(u);
-    for (auto n = matches.first; n != matches.second; ++n) {
-        if ((*n).second._v == _v)
-            return (*n).second._cost;
-    }
-
-    return -1;
-}
-
-
-int dijkstra(graph_t& G, int u, int v) {
-    std::priority_queue<edge_t*,
-                        std::vector<edge_t*>,
-                        std::less<edge_t*>> seen{};
-
-    auto neigbors = get_nb(G, u);
-    for (auto n = neigbors.first; n != neigbors.second; n++) {
-        edge_t* edge = &(*n).second;
-        edge->_dist = edge->_cost;
-        seen.push(edge);
-    }
-
-    edge_t* found = nullptr;
-    while (seen.size() > 0 && seen.top()->_v != v) {
-        edge_t *head = seen.top();
+    while (seen.size() > 0 && seen.top().first != end) {
+        std::pair<node_t*, int> head = seen.top();
+        node_t *top = head.first;
+        top->set_dist(head.second);
         seen.pop();
 
-        auto nb = get_nb(G, head->_v);
-        for (auto n = nb.first; n != nb.second; ++n) {
-            edge_t* edge = &(*n).second;
-            if (edge->_dist != -1) continue;
-            edge->_dist = head->_dist + edge->_cost;
-            seen.push(edge);
-            
-            if (edge->_v == v) {
-                found = edge;
-                break;
-            }
+        auto neighborhood = top->get_neighborhood();
+        for (auto nb: neighborhood) {
+            int dist = nb.second;
+            node_t *nd = nb.first;
+            if (!nd->is_new()) continue;
+            seen.push({nd, top->get_dist() + dist});
+
         }
     }
 
-    if (found)
-    cout << found->_v << " " << found->_dist << endl;
-    return 0;
+    if (seen.size() > 0)
+        return seen.top().second;
+    else
+        return -1;
 }
 
 
 int main(int argc, char **argv)
 {
-    graph_t G_b{};
-    
-    for (auto value : G) {
-        auto key = value.first;
-        auto nbrs = G.equal_range(key);
-        for (auto nbr = nbrs.first; nbr != nbrs.second; nbr++) { 
-            auto v = (*nbr).second._v;
-            auto cost = (*nbr).second._cost;
-        
-            auto even = 2 * key;
-            auto odd = 2 * key + 1;
-            cout << even << " " << (2 * v + 1) << endl;
-            G_b.insert({even, {2 * v + 1, cost}});
-            G_b.insert({odd, {2 * v, cost}});
-        }
-    }
+    std::vector<std::tuple<int, int, int>> graph{
+        {1, 2, 2},
+        {1, 3, 1},
+        {2, 3, 3}
+    };
 
-    dijkstra(G, 2, 10);
-
+  
+    graph = transform(graph);
+    std::pair<node_t*, node_t*> se = build(graph, 3, 6);
+    node_t * n = new node_t(9000);
+    int dist = dijkstra(se.first, se.second);
+    if (dist > 0)
+        cout << dist << endl;
+    else
+        cout << ":(" << endl;
+    //se.second->id();
     return 0;
 }
