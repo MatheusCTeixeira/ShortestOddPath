@@ -156,21 +156,23 @@ int dijkstra(node_t *start, node_t *end) {
 
 int main(int argc, char **argv)
 {
-    std::vector<std::tuple<int, int, int>> graph{
-        {1, 2, 2},
-        {1, 3, 1},
-        {2, 3, 3}
-    };
-
+    int N = 0, V = 0;
+    cin >> N >> V;
+    std::vector<std::tuple<int, int, int>> graph{};
+    for (int i = 0; i < V; ++i) {
+        int u, v, w;
+        cin >> u >> v >> w;
+        graph.push_back({u, v, w});
+    }
   
     graph = transform(graph);
-    std::pair<node_t*, node_t*> se = build(graph, 3, 6);
-    node_t * n = new node_t(9000);
+    std::pair<node_t*, node_t*> se = build(graph, 3, 2 * N);
+    
     int dist = dijkstra(se.first, se.second);
     if (dist > 0)
         cout << dist << endl;
     else
         cout << ":(" << endl;
-    //se.second->id();
+
     return 0;
 }
